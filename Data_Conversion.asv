@@ -1,0 +1,3 @@
+P
+load data_vsm_ddm_50.mat
+dlmwrite('test_data_50.txt',ans) 
