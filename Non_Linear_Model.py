@@ -1,3 +1,14 @@
+"""
+Non_Linear_Model.py 
+Solution of non linear equation of system of equation of inverter.
+Dependencies:
+    numpy, sympy,scipy
+
+Usage:
+    # Given X0, initial state
+    # returns the derivative of states for the solution of non linear equations of VSM based inverter
+"""
+
 from numpy import sqrt, sin, cos, pi
 import numpy as np
 

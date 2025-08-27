@@ -1,26 +1,22 @@
 """
 opt_dmd_fullrank.py
 
-Optimized Dynamic Mode Decomposition (optDMD) via Variable Projection
--- full-rank linear step (no SVD truncation) --
-Author: adapted for user (based on Askham & Kutz varpro optDMD)
-
+Optimized Dynamic Mode Decomposition (optDMD): From Paper: Askham, T., & Kutz, J. N. (2018). Variable projection methods for an optimized dynamic mode decomposition. SIAM Journal on Applied Dynamical Systems, 17(1), 380-416.
+For the accuracy full rank has been used. 
 Dependencies:
     numpy, scipy
 
 Usage:
     # Given X (n x m), t (m,), optional X_dot (n x m-1)
-    alpha, Phi, b, recon, info = opt_dmd_fullrank(X, t, r=None, reg=1e-8, solver_opts=None, verbose=False)
+    alpha, Phi, b, recon = opt_dmd_fullrank(X, t, r=None, reg=1e-8, solver_opts=None, verbose=False)
 """
 
 import numpy as np
 from numpy.linalg import pinv, norm
 from scipy.optimize import least_squares
 
-# -------------------------
-# Helpers
-# -------------------------
-def _build_exponential_matrix(t, alpha):
+
+def build_exponential_matrix(t, alpha):
     """
     V[k,j] = exp(alpha_j * t_k)
     t: (m,)
@@ -31,9 +27,9 @@ def _build_exponential_matrix(t, alpha):
     alpha = np.asarray(alpha).reshape(1, -1) # (1,r)
     return np.exp(t @ alpha)                 # (m,r)
 
-def _variable_projection_fullrank_solve(X, V, reg=0.0):
+def variable_projection_fullrank_solve(X, V, reg=0.0):
     """
-    Full-rank linear solve for A in X ~= A V^H with optional Tikhonov regularization.
+    Full-rank linear solve for A in X ~= A V^H 
 
     Minimizes || X - A V^H ||_F^2 + reg * ||A||_F^2
     Algebraic solution:
@@ -47,47 +43,41 @@ def _variable_projection_fullrank_solve(X, V, reg=0.0):
     G = VH @ V                            # (r, r)
     if reg is not None and reg > 0:
         G = G + reg * np.eye(G.shape[0])
-    # Use pseudoinverse for stability in case G is ill-conditioned
     Gpinv = pinv(G)
     A = X @ V @ Gpinv                     # (n, r)
     Xhat = A @ VH                         # (n, m)
     R = X - Xhat
     return A, R
 
-def _pack_alpha(alpha):
-    """complex alpha -> real vector (2r,)"""
+def pack_alpha(alpha):
+    #complex alpha -> real vector (2r,)
     alpha = np.asarray(alpha)
     return np.concatenate([alpha.real, alpha.imag])
 
-def _unpack_alpha(theta):
-    """real vector -> complex alpha (r,)"""
+def unpack_alpha(theta):
+    #real vector -> complex alpha (r,)
     theta = np.asarray(theta)
     r = theta.size // 2
     return theta[:r] + 1j * theta[r:]
 
-def _std_dmd_init_alpha_fullrank(X, t, r):
-    """
-    Use standard DMD (shifted snapshots) to build an initial alpha vector.
-    This routine tries to provide r initial values; if X has fewer dynamic eigenvalues,
-    the remaining entries are padded with zeros.
-    NOTE: This uses shifted data X[:, :-1], X[:, 1:] and returns up to r eigenvalues.
-    """
+def std_dmd_init_alpha_fullrank(X, t, r):
+    #Use standard DMD to build an initial alpha vector.
     n, m = X.shape
     if m < 2:
         return np.zeros(r, dtype=complex)
     X1 = X[:, :-1]
     X2 = X[:, 1:]
-    # if X1 is too small rank-wise, SVD will still work; we use full SVD but take min(r, rank)
+
     U, S, Vh = np.linalg.svd(X1, full_matrices=False)
     r0 = min(r, U.shape[1])
     Ur = U[:, :r0]
     Sr = S[:r0]
     Vr = Vh.conj().T[:, :r0]
-    # low-rank Atilde
+  
     Atilde = Ur.conj().T @ X2 @ Vr @ np.diag(1.0 / Sr)
     eigvals, _ = np.linalg.eig(Atilde)
     dt_med = np.median(np.diff(np.asarray(t)))
-    # avoid zeros
+
     eigvals_safe = np.where(np.abs(eigvals) < 1e-16, 1e-16, eigvals)
     alpha0 = np.log(eigvals_safe) / dt_med
     if r0 < r:
@@ -97,12 +87,12 @@ def _std_dmd_init_alpha_fullrank(X, t, r):
         alpha0 = alpha0[:r]
     return alpha0
 
-# -------------------------
+
 # Main full-rank optDMD
-# -------------------------
+
 def opt_dmd_fullrank(X, t, r=None, alpha0=None, reg=0.0, solver_opts=None, verbose=False):
     """
-    optDMD with full-rank linear step (no rank truncation).
+    optDMD with full-rank linear step .
     Parameters
     ----------
     X : ndarray (n, m)
@@ -115,7 +105,7 @@ def opt_dmd_fullrank(X, t, r=None, alpha0=None, reg=0.0, solver_opts=None, verbo
     alpha0 : ndarray (r,), optional
         Initial continuous-time eigenvalues. If None, they are initialized using std DMD.
     reg : float
-        Tikhonov regularization parameter for linear solve (recommended for full-rank).
+        Tikhonov regularization parameter for linear solve .
     solver_opts : dict, optional
         Passed to scipy.optimize.least_squares (e.g., max_nfev, ftol).
     verbose : bool
@@ -126,7 +116,6 @@ def opt_dmd_fullrank(X, t, r=None, alpha0=None, reg=0.0, solver_opts=None, verbo
     Phi : ndarray (n, r) complex (modes, columns normalized)
     b : ndarray (r,) complex (amplitudes)
     reconstructor : callable(t_new) -> X_rec (n, m_new)
-    info : dict (optimizer info and residual norm)
     """
     X = np.asarray(X)
     t = np.asarray(t).reshape(-1)
@@ -139,29 +128,28 @@ def opt_dmd_fullrank(X, t, r=None, alpha0=None, reg=0.0, solver_opts=None, verbo
         r = min(r, min(n, m))
 
     if alpha0 is None:
-        alpha0 = _std_dmd_init_alpha_fullrank(X, t, r)
+        alpha0 = std_dmd_init_alpha_fullrank(X, t, r)
 
-    theta0 = _pack_alpha(alpha0)
+    theta0 = pack_alpha(alpha0)
 
     def residual_theta(theta):
-        alpha = _unpack_alpha(theta)           # (r,)
-        V = _build_exponential_matrix(t, alpha) # (m, r)
-        A, R = _variable_projection_fullrank_solve(X, V, reg=reg)
+        alpha = unpack_alpha(theta)           # (r,)
+        V = build_exponential_matrix(t, alpha) # (m, r)
+        A, R = variable_projection_fullrank_solve(X, V, reg=reg)
         # return concatenated real and imag residuals
         Rvec = R.ravel()
         return np.concatenate([Rvec.real, Rvec.imag])
 
     if solver_opts is None:
         solver_opts = {"ftol": 1e-9, "xtol": 1e-9, "gtol": 1e-9, "max_nfev": 2000}
-
+    #solving the least square problem for V(alpha)
     ls_res = least_squares(
-        residual_theta, theta0, method="trf", jac='2-point',
-        verbose=2 if verbose else 0, **solver_opts
+        residual_theta, theta0, method="trf", jac='2-point', **solver_opts
     )
 
-    alpha_opt = _unpack_alpha(ls_res.x)        # (r,)
-    V_opt = _build_exponential_matrix(t, alpha_opt)
-    A_opt, R_opt = _variable_projection_fullrank_solve(X, V_opt, reg=reg)
+    alpha_opt = unpack_alpha(ls_res.x)        # (r,)
+    V_opt = build_exponential_matrix(t, alpha_opt)
+    A_opt, R_opt = variable_projection_fullrank_solve(X, V_opt, reg=reg)
 
     # Split A_opt into mode shapes Phi (unit-norm columns) and amplitudes b
     b = np.array([norm(A_opt[:, j]) for j in range(A_opt.shape[1])], dtype=np.complex128)
@@ -170,17 +158,8 @@ def opt_dmd_fullrank(X, t, r=None, alpha0=None, reg=0.0, solver_opts=None, verbo
     Phi = A_opt / b
 
     def reconstructor(t_new):
-        Vnew = _build_exponential_matrix(np.asarray(t_new).reshape(-1), alpha_opt)  # (m_new, r)
+        Vnew = build_exponential_matrix(np.asarray(t_new).reshape(-1), alpha_opt)  # (m_new, r)
         return Phi @ (np.diag(b) @ Vnew.conj().T)  # (n, m_new)
 
-    info = {
-        "cost": ls_res.cost,
-        "nfev": ls_res.nfev,
-        "status": ls_res.status,
-        "message": ls_res.message,
-        "residual_norm": norm(R_opt, 'fro'),
-        "r_used": r,
-        "reg": reg
-    }
-    return alpha_opt, Phi, b, reconstructor, info
+    return alpha_opt, Phi, b, reconstructor
 

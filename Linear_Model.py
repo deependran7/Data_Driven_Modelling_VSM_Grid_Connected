@@ -1,3 +1,14 @@
+"""
+Linear_Model.py 
+Linearization of the nonlinear VSM inverter model around an operating point.
+Dependencies:
+    numpy, sympy,scipy
+
+Usage:
+    # Given X0, initial state
+    # returns A,B matrices of linearized system
+"""
+
 from sympy import symbols,sin,cos,Matrix,diff,zeros
 import numpy as np
 
