@@ -1,4 +1,3 @@
-andes==1.9.2
 annotated-types==0.7.0
 asttokens==2.4.1
 attrs==23.2.0
@@ -16,7 +15,6 @@ colorama==0.4.6
 coloredlogs==15.0.1
 comm==0.2.2
 contourpy==1.2.1
-control==0.10.1
 cycler==0.12.1
 dask==2024.7.1
 debugpy==1.8.2
@@ -89,12 +87,10 @@ py-cpuinfo==9.0.0
 pyarrow==18.0.0
 pydantic==2.8.2
 pydantic_core==2.20.1
-PyDMD==2024.11.1
 Pygments==2.18.0
 pyogrio==0.9.0
 pyparsing==3.1.2
 pyproj==3.6.1
-pypsa==0.28.0
 pyreadline3==3.4.1
 pysindy==1.7.5
 pysketcher==0.0.9
